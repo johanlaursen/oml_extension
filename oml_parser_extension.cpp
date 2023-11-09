@@ -22,39 +22,12 @@
 
 namespace duckdb {
 
-// // Copied from SingleThreadedCSVFunction
-// static void ReadOMLFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
 
-//   auto &func_data = (FunctionData &)*data_p.bind_data;
-
-  
-//   string filename = data_p.inputs[0].ToString();
-
-//   std:: ifstream oml_file(filename);
-
-//   string line;
-
-//     // Logic to read and parse the OML file
-//     // For simplicity, let's assume we're reading a file line by line
-//     std::ifstream oml_file("your_file.oml");
-//     string line;
-//     idx_t current_row = 0;
-
-//     if (oml_file.is_open()) {
-//         while (getline(oml_file, line) && current_row < STANDARD_VECTOR_SIZE) {
-//             // Parse the line and store it in the output
-//             output.SetValue(0, current_row, Value(line));
-//             current_row++;
-//         }
-//         oml_file.close();
-//     }
-//     output.SetCardinality(current_row);
-// }
 
 // placeholder until actual function is implemented
 static void dummyReadOMLFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {}
 
-static unique_ptr<FunctionData> ReadOMLBind(ClientContext &context,
+static unique_ptr<FunctionData> ReadOMLBindDynamic(ClientContext &context,
  TableFunctionBindInput &input,
  vector<LogicalType> &return_types, vector<string> &names) {
   
@@ -190,10 +163,10 @@ static unique_ptr<FunctionData> ReadOMLBindStatic (
 
 static void LoadInternal(DatabaseInstance &instance) {
     vector<LogicalType> argument_types;
-    string name = "Power_Consumption_load";
+    string name = "read_oml_static";
 
     // Register a table function
-    auto oml_parser_table_function = TableFunction(name, argument_types, dummyReadOMLFunction, ReadOMLBind);
+    auto oml_parser_table_function = TableFunction(name, argument_types, dummyReadOMLFunction, ReadOMLBindStatic);
 
     ExtensionUtil::RegisterFunction(instance, oml_parser_table_function);
 
