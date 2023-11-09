@@ -23,7 +23,6 @@ public:
 
 struct ReadOMLTableFunction {
 	static TableFunction GetFunction();
-	static TableFunction GetAutoFunction();
 	static void RegisterFunction(BuiltinFunctions &set);
 };
 
