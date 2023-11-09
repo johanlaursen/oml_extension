@@ -22,271 +22,276 @@
 
 namespace duckdb {
 
+
+
+
+  
+
 // Not sure if GlobalTableFunctionState is needed as it appears to only be used for multiple files
-struct OMLState : public GlobalTableFunctionState {
-	explicit OMLState(idx_t total_files) : total_files(total_files), next_file(0), progress_in_files(0) {
-	}
+// struct OMLState : public GlobalTableFunctionState {
+// 	explicit OMLState(idx_t total_files) : total_files(total_files), next_file(0), progress_in_files(0) {
+// 	}
 
-	mutex csv_lock;
-	unique_ptr<BufferedCSVReader> initial_reader;
-	//! The total number of files to read from
-	idx_t total_files;
-	//! The index of the next file to read (i.e. current file + 1)
-	atomic<idx_t> next_file;
-	//! How far along we are in reading the current set of open files
-	//! This goes from [0...next_file] * 100
-	atomic<idx_t> progress_in_files;
-	//! The set of SQL types
-	vector<LogicalType> csv_types;
-	//! The set of SQL names to be read from the file
-	vector<string> csv_names;
-	//! The column ids to read
-	vector<column_t> column_ids;
+// 	mutex csv_lock;
+// 	unique_ptr<BufferedCSVReader> initial_reader;
+// 	//! The total number of files to read from
+// 	idx_t total_files;
+// 	//! The index of the next file to read (i.e. current file + 1)
+// 	atomic<idx_t> next_file;
+// 	//! How far along we are in reading the current set of open files
+// 	//! This goes from [0...next_file] * 100
+// 	atomic<idx_t> progress_in_files;
+// 	//! The set of SQL types
+// 	vector<LogicalType> csv_types;
+// 	//! The set of SQL names to be read from the file
+// 	vector<string> csv_names;
+// 	//! The column ids to read
+// 	vector<column_t> column_ids;
 
-	idx_t MaxThreads() const override {
-		return total_files;
-	}
+// 	idx_t MaxThreads() const override {
+// 		return total_files;
+// 	}
 
-	double GetProgress(const ReadCSVData &bind_data) const {
-		D_ASSERT(total_files == bind_data.files.size());
-		D_ASSERT(progress_in_files <= total_files * 100);
-		return (double(progress_in_files) / double(total_files));
-	}
+// 	double GetProgress(const ReadCSVData &bind_data) const {
+// 		D_ASSERT(total_files == bind_data.files.size());
+// 		D_ASSERT(progress_in_files <= total_files * 100);
+// 		return (double(progress_in_files) / double(total_files));
+// 	}
 
-	unique_ptr<BufferedCSVReader> GetCSVReader(ClientContext &context, ReadCSVData &bind_data, idx_t &file_index,
-	                                           idx_t &total_size) {
-		return GetCSVReaderInternal(context, bind_data, file_index, total_size);
-	}
+// 	unique_ptr<BufferedCSVReader> GetCSVReader(ClientContext &context, ReadCSVData &bind_data, idx_t &file_index,
+// 	                                           idx_t &total_size) {
+// 		return GetCSVReaderInternal(context, bind_data, file_index, total_size);
+// 	}
 
-private:
-	unique_ptr<BufferedCSVReader> GetCSVReaderInternal(ClientContext &context, ReadCSVData &bind_data,
-	                                                   idx_t &file_index, idx_t &total_size) {
-		CSVReaderOptions options;
-		{
-			lock_guard<mutex> l(csv_lock);
-			if (initial_reader) {
-				total_size = initial_reader->file_handle ? initial_reader->file_handle->FileSize() : 0;
-				return std::move(initial_reader);
-			}
-			if (next_file >= total_files) {
-				return nullptr;
-			}
-			options = bind_data.options;
-			file_index = next_file;
-			next_file++;
-		}
+// private:
+// 	unique_ptr<BufferedCSVReader> GetCSVReaderInternal(ClientContext &context, ReadCSVData &bind_data,
+// 	                                                   idx_t &file_index, idx_t &total_size) {
+// 		CSVReaderOptions options;
+// 		{
+// 			lock_guard<mutex> l(csv_lock);
+// 			if (initial_reader) {
+// 				total_size = initial_reader->file_handle ? initial_reader->file_handle->FileSize() : 0;
+// 				return std::move(initial_reader);
+// 			}
+// 			if (next_file >= total_files) {
+// 				return nullptr;
+// 			}
+// 			options = bind_data.options;
+// 			file_index = next_file;
+// 			next_file++;
+// 		}
 
-    // Can potentially delete some of the code below as we aren't using union_readers
-		// reuse csv_readers was created during binding (comment from original code)
-		unique_ptr<BufferedCSVReader> result;
-		if (file_index < bind_data.union_readers.size() && bind_data.union_readers[file_index]) {
-			result = std::move(bind_data.union_readers[file_index]);
-		} else {
-			auto union_by_name = options.file_options.union_by_name;
-			options.file_path = bind_data.files[file_index];
-			result = make_uniq<BufferedCSVReader>(context, std::move(options), csv_types);
-			if (!union_by_name) {
-				result->names = csv_names;
-			}
-			MultiFileReader::InitializeReader(*result, bind_data.options.file_options, bind_data.reader_bind,
-			                                  bind_data.return_types, bind_data.return_names, column_ids, nullptr,
-			                                  bind_data.files.front(), context);
-		}
-		total_size = result->file_handle->FileSize();
-		return result;
-	}
-};
+//     // Can potentially delete some of the code below as we aren't using union_readers
+// 		// reuse csv_readers was created during binding (comment from original code)
+// 		unique_ptr<BufferedCSVReader> result;
+// 		if (file_index < bind_data.union_readers.size() && bind_data.union_readers[file_index]) {
+// 			result = std::move(bind_data.union_readers[file_index]);
+// 		} else {
+// 			auto union_by_name = options.file_options.union_by_name;
+// 			options.file_path = bind_data.files[file_index];
+// 			result = make_uniq<BufferedCSVReader>(context, std::move(options), csv_types);
+// 			if (!union_by_name) {
+// 				result->names = csv_names;
+// 			}
+// 			MultiFileReader::InitializeReader(*result, bind_data.options.file_options, bind_data.reader_bind,
+// 			                                  bind_data.return_types, bind_data.return_names, column_ids, nullptr,
+// 			                                  bind_data.files.front(), context);
+// 		}
+// 		total_size = result->file_handle->FileSize();
+// 		return result;
+// 	}
+// };
 
 
 // from duckdb/src/function/table/read_csv.cpp:719~734
-struct OMLLocalState : public LocalTableFunctionState {
-public:
-	explicit OMLLocalState() : bytes_read(0), total_size(0), current_progress(0), file_index(0) {
-	}
+// struct OMLLocalState : public LocalTableFunctionState {
+// public:
+// 	explicit OMLLocalState() : bytes_read(0), total_size(0), current_progress(0), file_index(0) {
+// 	}
 
-	//! The CSV reader
-	unique_ptr<BufferedCSVReader> csv_reader;
-	//! The current amount of bytes read by this reader
-	idx_t bytes_read;
-	//! The total amount of bytes in the file
-	idx_t total_size;
-	//! The current progress from 0..100
-	idx_t current_progress;
-	//! The file index of this reader
-	idx_t file_index;
-};
+// 	//! The CSV reader
+// 	unique_ptr<BufferedCSVReader> csv_reader;
+// 	//! The current amount of bytes read by this reader
+// 	idx_t bytes_read;
+// 	//! The total amount of bytes in the file
+// 	idx_t total_size;
+// 	//! The current progress from 0..100
+// 	idx_t current_progress;
+// 	//! The file index of this reader
+// 	idx_t file_index;
+// };
 
-// from SingleThreadedCSVInit duckdb/src/function/table/read_csv.cpp:736~776
-static unique_ptr<GlobalTableFunctionState> OMLInit(ClientContext &context,
-                                                                  TableFunctionInitInput &input) {
-	auto &bind_data = input.bind_data->CastNoConst<ReadCSVData>();
-	auto result = make_uniq<OMLState>(bind_data.files.size());
+// // from SingleThreadedCSVInit duckdb/src/function/table/read_csv.cpp:736~776
+// static unique_ptr<GlobalTableFunctionState> OMLInit(ClientContext &context,
+//                                                                   TableFunctionInitInput &input) {
+// 	auto &bind_data = input.bind_data->CastNoConst<ReadCSVData>();
+// 	auto result = make_uniq<OMLState>(bind_data.files.size());
 
-  // Potentially remove this
-	if (bind_data.files.empty()) {
-		// This can happen when a filename based filter pushdown has eliminated all possible files for this scan.
-		return std::move(result);
-	} else {
-    // Isn't this already covered in bind function???
-		bind_data.options.file_path = bind_data.files[0];
-		result->initial_reader = make_uniq<BufferedCSVReader>(context, bind_data.options, bind_data.csv_types);
+//   // Potentially remove this
+// 	if (bind_data.files.empty()) {
+// 		// This can happen when a filename based filter pushdown has eliminated all possible files for this scan.
+// 		return std::move(result);
+// 	} else {
+//     // Isn't this already covered in bind function???
+// 		bind_data.options.file_path = bind_data.files[0];
+// 		result->initial_reader = make_uniq<BufferedCSVReader>(context, bind_data.options, bind_data.csv_types);
 		
-    // Commented out if as not using union_by_name
-    // if (!bind_data.options.file_options.union_by_name) {
-			result->initial_reader->names = bind_data.csv_names;
-		// }
+//     // Commented out if as not using union_by_name
+//     // if (!bind_data.options.file_options.union_by_name) {
+// 			result->initial_reader->names = bind_data.csv_names;
+// 		// }
 
-    // TODO can probably comment out if statement as auto_detect should always be true for all oml_read functions
-		if (bind_data.options.auto_detect) {
-      // TODO find out where initial_reader is intialized
-			bind_data.options = result->initial_reader->options;
-		}
-	}
-	MultiFileReader::InitializeReader(*result->initial_reader, bind_data.options.file_options, bind_data.reader_bind,
-	                                  bind_data.return_types, bind_data.return_names, input.column_ids, input.filters,
-	                                  bind_data.files.front(), context);
+//     // TODO can probably comment out if statement as auto_detect should always be true for all oml_read functions
+// 		if (bind_data.options.auto_detect) {
+//       // TODO find out where initial_reader is intialized
+// 			bind_data.options = result->initial_reader->options;
+// 		}
+// 	}
+// 	MultiFileReader::InitializeReader(*result->initial_reader, bind_data.options.file_options, bind_data.reader_bind,
+// 	                                  bind_data.return_types, bind_data.return_names, input.column_ids, input.filters,
+// 	                                  bind_data.files.front(), context);
 	
-  // Shouldn't have union_readers as we arent doing any union bind stuff so commenting out
-  // for (auto &reader : bind_data.union_readers) {
-	// 	if (!reader) {
-	// 		continue;
-	// 	}
-	// 	MultiFileReader::InitializeReader(*reader, bind_data.options.file_options, bind_data.reader_bind,
-	// 	                                  bind_data.return_types, bind_data.return_names, input.column_ids,
-	// 	                                  input.filters, bind_data.files.front(), context);
-	// }
+//   // Shouldn't have union_readers as we arent doing any union bind stuff so commenting out
+//   // for (auto &reader : bind_data.union_readers) {
+// 	// 	if (!reader) {
+// 	// 		continue;
+// 	// 	}
+// 	// 	MultiFileReader::InitializeReader(*reader, bind_data.options.file_options, bind_data.reader_bind,
+// 	// 	                                  bind_data.return_types, bind_data.return_names, input.column_ids,
+// 	// 	                                  input.filters, bind_data.files.front(), context);
+// 	// }
 
-  // TODO Is this created by bind function?
-	result->column_ids = input.column_ids;
+//   // TODO Is this created by bind function?
+// 	result->column_ids = input.column_ids;
 
-  // Not using union_by_name so commenting out
-	// if (!bind_data.options.file_options.union_by_name) {
-	// 	// if we are reading multiple files - run auto-detect only on the first file
-	// 	// UNLESS union by name is turned on - in that case we assume that different files have different schemas
-	// 	// as such, we need to re-run the auto detection on each file
-	// 	bind_data.options.auto_detect = false;
-	// }
-	result->csv_types = bind_data.csv_types;
-	result->csv_names = bind_data.csv_names;
-	result->next_file = 1;
-	return std::move(result);
-}
+//   // Not using union_by_name so commenting out
+// 	// if (!bind_data.options.file_options.union_by_name) {
+// 	// 	// if we are reading multiple files - run auto-detect only on the first file
+// 	// 	// UNLESS union by name is turned on - in that case we assume that different files have different schemas
+// 	// 	// as such, we need to re-run the auto detection on each file
+// 	// 	bind_data.options.auto_detect = false;
+// 	// }
+// 	result->csv_types = bind_data.csv_types;
+// 	result->csv_names = bind_data.csv_names;
+// 	result->next_file = 1;
+// 	return std::move(result);
+// }
 
-unique_ptr<LocalTableFunctionState> OMLInitLocal(ExecutionContext &context,
-                                                                   TableFunctionInitInput &input,
-                                                                   GlobalTableFunctionState *global_state_p) {
-	auto &bind_data = input.bind_data->CastNoConst<ReadCSVData>();
-	auto &data = global_state_p->Cast<OMLState>();
-	auto result = make_uniq<OMLLocalState>();
-	result->csv_reader = data.GetCSVReader(context.client, bind_data, result->file_index, result->total_size);
-	return std::move(result);
-}
+// unique_ptr<LocalTableFunctionState> OMLInitLocal(ExecutionContext &context,
+//                                                                    TableFunctionInitInput &input,
+//                                                                    GlobalTableFunctionState *global_state_p) {
+// 	auto &bind_data = input.bind_data->CastNoConst<ReadCSVData>();
+// 	auto &data = global_state_p->Cast<OMLState>();
+// 	auto result = make_uniq<OMLLocalState>();
+// 	result->csv_reader = data.GetCSVReader(context.client, bind_data, result->file_index, result->total_size);
+// 	return std::move(result);
+// }
 
-static void OMLFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
-	auto &bind_data = data_p.bind_data->CastNoConst<ReadCSVData>();
-	auto &data = data_p.global_state->Cast<OMLState>();
-	auto &lstate = data_p.local_state->Cast<OMLLocalState>();
-	if (!lstate.csv_reader) {
-		// no csv_reader was set, this can happen when a filename-based filter has filtered out all possible files
-		return;
-	}
+// static void OMLFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
+// 	auto &bind_data = data_p.bind_data->CastNoConst<ReadCSVData>();
+// 	auto &data = data_p.global_state->Cast<OMLState>();
+// 	auto &lstate = data_p.local_state->Cast<OMLLocalState>();
+// 	if (!lstate.csv_reader) {
+// 		// no csv_reader was set, this can happen when a filename-based filter has filtered out all possible files
+// 		return;
+// 	}
 
-	do {
-		lstate.csv_reader->ParseCSV(output);
-		// update the number of bytes read
-		D_ASSERT(lstate.bytes_read <= lstate.csv_reader->bytes_in_chunk);
-		auto bytes_read = MinValue<idx_t>(lstate.total_size, lstate.csv_reader->bytes_in_chunk);
-		auto current_progress = lstate.total_size == 0 ? 100 : 100 * bytes_read / lstate.total_size;
-		if (current_progress > lstate.current_progress) {
-			if (current_progress > 100) {
-				throw InternalException("Progress should never exceed 100");
-			}
-			data.progress_in_files += current_progress - lstate.current_progress;
-			lstate.current_progress = current_progress;
-		}
-		if (output.size() == 0) {
-			// exhausted this file, but we might have more files we can read
-			auto csv_reader = data.GetCSVReader(context, bind_data, lstate.file_index, lstate.total_size);
-			// add any left-over progress for this file to the progress bar
-			if (lstate.current_progress < 100) {
-				data.progress_in_files += 100 - lstate.current_progress;
-			}
-			// reset the current progress
-			lstate.current_progress = 0;
-			lstate.bytes_read = 0;
-			lstate.csv_reader = std::move(csv_reader);
-			if (!lstate.csv_reader) {
-				// no more files - we are done
-				return;
-			}
-			lstate.bytes_read = 0;
-		} else {
-			MultiFileReader::FinalizeChunk(bind_data.reader_bind, lstate.csv_reader->reader_data, output);
-			break;
-		}
-	} while (true);
-}
+// 	do {
+// 		lstate.csv_reader->ParseCSV(output);
+// 		// update the number of bytes read
+// 		D_ASSERT(lstate.bytes_read <= lstate.csv_reader->bytes_in_chunk);
+// 		auto bytes_read = MinValue<idx_t>(lstate.total_size, lstate.csv_reader->bytes_in_chunk);
+// 		auto current_progress = lstate.total_size == 0 ? 100 : 100 * bytes_read / lstate.total_size;
+// 		if (current_progress > lstate.current_progress) {
+// 			if (current_progress > 100) {
+// 				throw InternalException("Progress should never exceed 100");
+// 			}
+// 			data.progress_in_files += current_progress - lstate.current_progress;
+// 			lstate.current_progress = current_progress;
+// 		}
+// 		if (output.size() == 0) {
+// 			// exhausted this file, but we might have more files we can read
+// 			auto csv_reader = data.GetCSVReader(context, bind_data, lstate.file_index, lstate.total_size);
+// 			// add any left-over progress for this file to the progress bar
+// 			if (lstate.current_progress < 100) {
+// 				data.progress_in_files += 100 - lstate.current_progress;
+// 			}
+// 			// reset the current progress
+// 			lstate.current_progress = 0;
+// 			lstate.bytes_read = 0;
+// 			lstate.csv_reader = std::move(csv_reader);
+// 			if (!lstate.csv_reader) {
+// 				// no more files - we are done
+// 				return;
+// 			}
+// 			lstate.bytes_read = 0;
+// 		} else {
+// 			MultiFileReader::FinalizeChunk(bind_data.reader_bind, lstate.csv_reader->reader_data, output);
+// 			break;
+// 		}
+// 	} while (true);
+// }
 
 
 // placeholder until actual function is implemented
-static void dummyReadOMLFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {}
+// static void dummyReadOMLFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {}
 
-static unique_ptr<FunctionData> ReadOMLBindDynamic(ClientContext &context,
- TableFunctionBindInput &input,
- vector<LogicalType> &return_types, vector<string> &names) {
+// static unique_ptr<FunctionData> ReadOMLBindDynamic(ClientContext &context,
+//  TableFunctionBindInput &input,
+//  vector<LogicalType> &return_types, vector<string> &names) {
   
-  string filename = input.inputs[0].ToString();
+//   string filename = input.inputs[0].ToString();
 
-  std:: ifstream oml_file(filename);
+//   std:: ifstream oml_file(filename);
 
-  string line;
+//   string line;
 
-  if (oml_file.is_open()){
-    while (getline(oml_file, line)){
-      if (line.empty()) {
-            // Stop processing if a blank line is encountered
-            break;
-        }
+//   if (oml_file.is_open()){
+//     while (getline(oml_file, line)){
+//       if (line.empty()) {
+//             // Stop processing if a blank line is encountered
+//             break;
+//         }
 
-      string word;
-      std::stringstream ss(line);
+//       string word;
+//       std::stringstream ss(line);
 
-      ss >> word;
-      if (word == "schema:"){
-        // process schema line
-        string schema_definition;
-        while (ss >> schema_definition){
-          size_t colon_pos = schema_definition.find(':');
-          if (colon_pos == string::npos) {
-          // If no colon found, skip to the next word
-          continue;
-          }
-          if (colon_pos != string::npos) {
-              string var_name = schema_definition.substr(0, colon_pos);
-              string var_type = schema_definition.substr(colon_pos + 1);
+//       ss >> word;
+//       if (word == "schema:"){
+//         // process schema line
+//         string schema_definition;
+//         while (ss >> schema_definition){
+//           size_t colon_pos = schema_definition.find(':');
+//           if (colon_pos == string::npos) {
+//           // If no colon found, skip to the next word
+//           continue;
+//           }
+//           if (colon_pos != string::npos) {
+//               string var_name = schema_definition.substr(0, colon_pos);
+//               string var_type = schema_definition.substr(colon_pos + 1);
               
-              // Save the variable name
-              names.push_back(var_name);
+//               // Save the variable name
+//               names.push_back(var_name);
               
-              // Map the OML type to DuckDB LogicalType
-              if (var_type == "string") {
-                  return_types.push_back(LogicalType::VARCHAR);
-              } else if (var_type == "uint32") {
-                  return_types.push_back(LogicalType::UINTEGER);
-              } else if (var_type == "double") {
-                  return_types.push_back(LogicalType::DOUBLE);
-              }   
-            }
+//               // Map the OML type to DuckDB LogicalType
+//               if (var_type == "string") {
+//                   return_types.push_back(LogicalType::VARCHAR);
+//               } else if (var_type == "uint32") {
+//                   return_types.push_back(LogicalType::UINTEGER);
+//               } else if (var_type == "double") {
+//                   return_types.push_back(LogicalType::DOUBLE);
+//               }   
+//             }
       
 
-        }
-      }
+//         }
+//       }
                                  
-    }
-      // Is this line needed?
-    }
-  return make_unique<FunctionData>(); 
-  }
+//     }
+//       // Is this line needed?
+//     }
+//   return make_unique<FunctionData>(); 
+//   }
 
 // This version attempts to copy ReadCSVBind and hardcode the names and types
 static unique_ptr<FunctionData> ReadOMLBindStatic (
@@ -393,13 +398,16 @@ static unique_ptr<FunctionData> ReadOMLBindStatic (
 // }
 
 static void LoadInternal(DatabaseInstance &instance) {
-    vector<LogicalType> argument_types;
     string name = "read_oml_static";
 
     // Register a table function
-    auto oml_parser_table_function = TableFunction(name, argument_types, OMLFunction, ReadOMLBindStatic, OMLInit, OMLInitLocal);
+    // auto oml_parser_table_function = TableFunction(name, {LogicalType::VARCHAR}, OMLFunction, ReadOMLBindStatic, OMLInit, OMLInitLocal);
 
-    ExtensionUtil::RegisterFunction(instance, oml_parser_table_function);
+    auto read_oml_static = ReadCSVTableFunction::GetFunction();
+    read_oml_static.name = "read_oml_static";
+    read_oml_static.bind = ReadOMLBindStatic;
+    
+    ExtensionUtil::RegisterFunction(instance, read_oml_static);
 
 }
 

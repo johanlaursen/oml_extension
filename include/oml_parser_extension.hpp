@@ -21,10 +21,10 @@ public:
 };
 
 
-struct ReadOMLTableFunction {
-	static TableFunction GetFunction();
-	static void RegisterFunction(BuiltinFunctions &set);
-};
+// struct ReadOMLTableFunction {
+// 	static TableFunction GetFunction();
+// 	static void RegisterFunction(BuiltinFunctions &set);
+// };
 
 
 
